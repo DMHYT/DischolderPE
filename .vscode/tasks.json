@@ -1,0 +1,15 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Download docs",
+            "type": "shell",
+            // "options": {
+            //     "cwd": "tools\\"
+            // },
+            "command": "tools\\loaddocs.bat",
+            "group": "build",
+            "problemMatcher": []
+        }
+    ]
+}
