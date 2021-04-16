@@ -10,6 +10,8 @@
     "compileOnSave": false,
     "include": [
         "tools/declarations/*.d.ts",
-        "**/*.ts"
+        "source/header.ts",
+        "source/api.ts",
+        "source/footer.ts"
     ]
 }

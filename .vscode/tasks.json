@@ -4,12 +4,16 @@
         {
             "label": "Download docs",
             "type": "shell",
-            // "options": {
-            //     "cwd": "tools\\"
-            // },
             "command": "tools\\loaddocs.bat",
             "group": "build",
             "problemMatcher": []
+        },
+        {
+            "label": "Build mod",
+            "type": "typescript",
+            "tsconfig": "tsconfig.json",
+            "group": "build",
+            "problemMatcher": ["$tsc"]
         }
     ]
 }
