@@ -1,3 +1,9 @@
+Callback.addCallback("ItemUseLocalServer", function(coords, item, block, isExternal, player){
+    if(item.id == 280){
+        Debug.m(BlockSource.getDefaultForActor(player).getBlockId(coords.x, coords.y, coords.z));
+    }
+});
+
 /**
  * Just for rotation model by 90 degrees CCW by Y-axis
  */
@@ -41,6 +47,43 @@ namespace ModelRotation {
 
 }
 
+/**
+ * For handling block's movements by pistons
+ */
+namespace PistonHandler {
+
+    export type Data = [Nullable<Vector>, boolean];
+
+    export function handle(x: number, y: number, z: number, region: BlockSource, id: number): Data {
+        let sides: [number, number, number][] = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+        let neededSide: [number, number, number] = null;
+        for(let side of sides){
+            if(region.getBlockId(x + side[0], y + side[1], z + side[2]) == id) neededSide = side;
+        }
+        if(neededSide == null) return [null, false];
+        let xx: number = neededSide[0] != 0 ? neededSide[0] : 0;
+        let yy: number = neededSide[1] != 0 ? neededSide[1] : 0;
+        let zz: number = neededSide[2] != 0 ? neededSide[2] : 0;
+        for(let i=1; i<=13; i++){
+            let potentialPiston = region.getBlockId(x - xx * i, y - yy * i, z - zz * i);
+            if(potentialPiston == 33 || potentialPiston == 29){
+                return [{x: x + neededSide[0], y: y + neededSide[1], z: z + neededSide[2]}, true];
+            }
+        }
+        return [null, false];
+    }
+
+    export function postHandle(x: number, y: number, z: number, region: BlockSource, data: Data): void {
+        let tile = TileEntity.getTileEntity(x, y, z, region);
+        let newTile = TileEntity.getTileEntity(data[0].x, data[0].y, data[0].z, region);
+        for(let i=0; i<7; i++){
+            let slot = tile.container.getSlot("slot" + i);
+            if(slot.id != 0) newTile.container.setSlot("slot" + i, slot.id, slot.count, slot.data, slot.extra);
+        }
+    }
+
+}
+
 namespace DiscHolder {
 
     export function setupModel(id: number, planksId: number, planksData: number, materialId: number, materialData: number): void {
@@ -70,6 +113,12 @@ namespace DiscHolder {
                 else throw new java.lang.IllegalStateException("Invalid entity look angle!"); //for debug
             }
         });
+        Block.registerDropFunction(id, function(coords, blockID, blockData, level, enchant, item, region){
+            return [[blockID, 1, 0]];
+        });
+        Block.registerPopResourcesFunction(id, function(coords, block, region){
+            
+        });
         Block.setShape(id, 0, 0, 0, 1, 6 / 16, 1);
         const shape = new ICRender.CollisionShape();
         shape.addEntry().addBox(0, 0, 0, 1, 6 / 16, 1);
@@ -82,10 +131,13 @@ namespace DiscHolder {
             client: {
                 updateModel(){
                     let blockData = World.getBlockData(this.x, this.y, this.z);
-                    Debug.m(blockData);
+                    if(blockData == 1919221760) blockData = 0;
                     for(let i=0; i<7; i++){
                         if(this["model" + i]) this["model" + i].destroy();
-                        this["model" + i] = new Animation.Item(this.x + 1 - (1/8 + 1/16 + (blockData == 1919221760 ? 1/8 * i : 2.5/8)), this.y + 0.5, this.z + 1 - (1/8 + 1/16 + (blockData == 1 ? 1/8 * i : 2.5/8)));
+                        let xx = this.x + (blockData == 0 ? 1 - (5/32 + 1/8 * i) : 19/32);
+                        let zz = this.z + (blockData == 1 ? 5/32 + 1/8 * i : 19/32);
+                        let yy = this.y + 7/16;
+                        this["model" + i] = new Animation.Item(xx, yy, zz);
                         let id = Network.serverToLocalId(this.networkData.getInt("animId" + i));
                         let data = this.networkData.getInt("animData" + i);
                         this["model" + i].describeItem({
@@ -125,21 +177,18 @@ namespace DiscHolder {
                 coords.x %= 1, coords.z %= 1;
                 coords.x *= 8, coords.z *= 8;
                 coords.x = Math.abs(coords.x); coords.z = Math.abs(coords.z);
-                Debug.m(coords.x + ", " + coords.z);
                 if(blockData == 0){
-                    if(coords.x < 0.5 || coords.x > 7.5) return -1;
-                    return Math.floor(coords.x - 1);
+                    if(coords.x < 0.09375 || coords.x > 7.90625) return -1;
+                    return 6 - Math.floor(coords.x - 1);
                 } else {
-                    if(coords.z < 0.5 || coords.z > 7.5) return -1;
-                    return Math.floor(coords.z - 1);
+                    if(coords.z < 0.09375 || coords.z > 7.90625) return -1;
+                    return 6 - Math.floor(coords.z - 1);
                 }
             },
             click(id: number, count: number, data: number, coords: Callback.ItemUseCoordinates, player: number, extra: ItemExtraData){
-                let slot: number = this.getSlotFromVec(coords.vec)
-                Debug.m("Item: " + id + ", " + count + ", " + data)
-                Debug.m("Slot is " + slot)
+                let slot: number = this.getSlotFromVec(coords.vec);
                 if(slot != -1){
-                    if(id != 0){//temporarily
+                    if(DiscHolder.isDisc(id, data)){
                         if(this.container.getSlot("slot" + slot).id == 0){
                             this.setSlot("slot" + slot, id, 1, data, extra);
                             Entity.setCarriedItem(player, id, count - 1, data, extra);
@@ -157,13 +206,21 @@ namespace DiscHolder {
                 for(let i=0; i<7; i++){
                     if(this["model" + i]) this["model" + i].destroy();
                 }
+                let handle: PistonHandler.Data = PistonHandler.handle(this.x, this.y, this.z, this.blockSource, id);
+                if(handle[1]){
+                    PistonHandler.postHandle(this.x, this.y, this.z, this.blockSource, handle);
+                    return true;
+                }
             }
         });
     }
 
     export function create(id: string, nameKey: string, planksId: number, planksData: number, materialId: number, materialData: number, fenceId: number, slabId: number): void {
         IDRegistry.genBlockID(id);
-        Block.createBlock(id, [{name: nameKey, texture: [["unknown", 0]], inCreative: true}, {name: nameKey, texture: [["unknown", 0]], inCreative: false}]);
+        Block.createBlock(id, [
+            {name: nameKey, texture: [["unknown", 0]], inCreative: true}, 
+            {name: nameKey, texture: [["unknown", 0]], inCreative: false}
+        ], {base: 5, sound: "wood"});
         ToolAPI.registerBlockMaterial(BlockID[id], "wood", 0, false);
         Block.setDestroyTime(BlockID[id], 40);
         setupModel(BlockID[id], planksId, planksData, materialId, materialData);
