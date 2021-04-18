@@ -5,13 +5,17 @@
         "downlevelIteration": true,
         "target": "ES5",
         "lib": ["ESNext"],
-        "outFile": "out/DiscHolderPE/main.js"
+        "outFile": "out/DischolderPE/main.js"
     },
     "compileOnSave": false,
     "include": [
         "tools/declarations/*.d.ts",
         "source/header.ts",
         "source/api.ts",
-        "source/footer.ts"
+        "source/footer.ts",
+        "source/translation.ts"
+    ],
+    "exclude": [
+        "tools/declarations/DischolderCore.d.ts"
     ]
 }

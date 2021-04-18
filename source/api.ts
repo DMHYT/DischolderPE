@@ -1,9 +1,3 @@
-Callback.addCallback("ItemUseLocalServer", function(coords, item, block, isExternal, player){
-    if(item.id == 280){
-        Debug.m(BlockSource.getDefaultForActor(player).getBlockId(coords.x, coords.y, coords.z));
-    }
-});
-
 /**
  * Just for rotation model by 90 degrees CCW by Y-axis
  */
@@ -73,18 +67,19 @@ namespace PistonHandler {
         return [null, false];
     }
 
-    export function postHandle(x: number, y: number, z: number, region: BlockSource, data: Data): void {
-        let tile = TileEntity.getTileEntity(x, y, z, region);
-        let newTile = TileEntity.getTileEntity(data[0].x, data[0].y, data[0].z, region);
+    export function postHandle(region: BlockSource, data: Data, oldTile: TileEntity): void {
+        let newTile = TileEntity.getTileEntity(data[0].x, data[0].y, data[0].z, region) || TileEntity.addTileEntity(data[0].x, data[0].y, data[0].z, region);
         for(let i=0; i<7; i++){
-            let slot = tile.container.getSlot("slot" + i);
+            let slot = oldTile.container.getSlot("slot" + i);
             if(slot.id != 0) newTile.container.setSlot("slot" + i, slot.id, slot.count, slot.data, slot.extra);
         }
+        oldTile.data.movedByPiston = true;
+        TileEntity.destroyTileEntity(oldTile);
     }
 
 }
 
-namespace DiscHolder {
+namespace Discholder {
 
     export function setupModel(id: number, planksId: number, planksData: number, materialId: number, materialData: number): void {
         const boxes: ModelRotation.BoxSet = [
@@ -113,21 +108,18 @@ namespace DiscHolder {
                 else throw new java.lang.IllegalStateException("Invalid entity look angle!"); //for debug
             }
         });
-        Block.registerDropFunction(id, function(coords, blockID, blockData, level, enchant, item, region){
-            return [[blockID, 1, 0]];
-        });
-        Block.registerPopResourcesFunction(id, function(coords, block, region){
-            
-        });
         Block.setShape(id, 0, 0, 0, 1, 6 / 16, 1);
         const shape = new ICRender.CollisionShape();
         shape.addEntry().addBox(0, 0, 0, 1, 6 / 16, 1);
         BlockRenderer.setCustomCollisionShape(id, -1, shape);
     }
 
-    export function setupTileEntity(id: number): void {
+    export function setupTile(id: number): void {
         TileEntity.registerPrototype(id, {
             useNetworkItemContainer: true,
+            defaultValues: {
+                movedByPiston: false
+            },
             client: {
                 updateModel(){
                     let blockData = World.getBlockData(this.x, this.y, this.z);
@@ -187,8 +179,8 @@ namespace DiscHolder {
             },
             click(id: number, count: number, data: number, coords: Callback.ItemUseCoordinates, player: number, extra: ItemExtraData){
                 let slot: number = this.getSlotFromVec(coords.vec);
-                if(slot != -1){
-                    if(DiscHolder.isDisc(id, data)){
+                if(slot != -1 && slot < 7){
+                    if(Discholder.isDisc(id, data)){
                         if(this.container.getSlot("slot" + slot).id == 0){
                             this.setSlot("slot" + slot, id, 1, data, extra);
                             Entity.setCarriedItem(player, id, count - 1, data, extra);
@@ -206,16 +198,22 @@ namespace DiscHolder {
                 for(let i=0; i<7; i++){
                     if(this["model" + i]) this["model" + i].destroy();
                 }
-                let handle: PistonHandler.Data = PistonHandler.handle(this.x, this.y, this.z, this.blockSource, id);
-                if(handle[1]){
-                    PistonHandler.postHandle(this.x, this.y, this.z, this.blockSource, handle);
+                if(this.data.movedByPiston){
+                    for(let i=0; i<7; i++){
+                        this.container.setSlot("slot" + i, 0, 0, 0, null);
+                    }
+                    return false;
+                }
+                let handleData: PistonHandler.Data = PistonHandler.handle(this.x, this.y, this.z, this.blockSource, id);
+                if(handleData[1]){
+                    PistonHandler.postHandle(this.blockSource, handleData, this);
                     return true;
                 }
             }
         });
     }
 
-    export function create(id: string, nameKey: string, planksId: number, planksData: number, materialId: number, materialData: number, fenceId: number, slabId: number): void {
+    export function create(id: string, nameKey: string, planksId: number, planksData: number, materialId: number, materialData: number, fenceId: number, slabId: number): number {
         IDRegistry.genBlockID(id);
         Block.createBlock(id, [
             {name: nameKey, texture: [["unknown", 0]], inCreative: true}, 
@@ -223,11 +221,16 @@ namespace DiscHolder {
         ], {base: 5, sound: "wood"});
         ToolAPI.registerBlockMaterial(BlockID[id], "wood", 0, false);
         Block.setDestroyTime(BlockID[id], 40);
+        Block.registerDropFunction(id, function(coords, blockID, blockData, level, enchant, item, region){
+            return [[blockID, 1, 0]];
+        });
+        Item.setCategory(BlockID[id], EItemCategory.DECORATION);
         setupModel(BlockID[id], planksId, planksData, materialId, materialData);
-        setupTileEntity(BlockID[id]);
+        setupTile(BlockID[id]);
         Callback.addCallback("PostLoaded", function(){
             Recipes.addShaped({id: BlockID[id], count: 1, data: 0}, ["   ", "fwf", "sss"], ['f', fenceId, 0, 'w', materialId, materialData, 's', slabId, 0]);
         });
+        return BlockID[id];
     }
 
     export const DISCS: {[key: string]: boolean} = {};
