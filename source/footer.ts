@@ -17,7 +17,7 @@ Discholder.addDisc(857, 0); //pigstep
     let colors: string[] = ["white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray", "lightgray", "cyan", "purple", "blue", "brown", "green", "red", "black"];
     for(let i in colors) group.push(Discholder.create(`${colors[i]}Discholder`, `discholder.${colors[i]}`, 5, 0, 35, parseInt(i), 85, 158));
     Item.addCreativeGroup("discholders", Translation.translate("group.discholders"), group);
-});
+})();
 
 ModAPI.registerAPI("DischolderCore", {
     Core: Discholder,

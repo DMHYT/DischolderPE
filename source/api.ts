@@ -58,12 +58,15 @@ namespace PistonHandler {
         let xx: number = neededSide[0] != 0 ? neededSide[0] : 0;
         let yy: number = neededSide[1] != 0 ? neededSide[1] : 0;
         let zz: number = neededSide[2] != 0 ? neededSide[2] : 0;
-        for(let i=1; i<=13; i++){
-            let potentialPiston = region.getBlockId(x - xx * i, y - yy * i, z - zz * i);
-            if(potentialPiston == 33 || potentialPiston == 29){
-                return [{x: x + neededSide[0], y: y + neededSide[1], z: z + neededSide[2]}, true];
+        for(let a=-1; a<2; a+=2){
+            for(let i=1; i<=13; i++){
+                let potentialPiston = region.getBlockId(x + (xx * i * a), y + (yy * i * a), z + (zz * i * a));
+                if(potentialPiston == 33 || potentialPiston == 29){
+                    return [{x: x + neededSide[0], y: y + neededSide[1], z: z + neededSide[2]}, true];
+                }
             }
         }
+        
         return [null, false];
     }
 
@@ -216,15 +219,15 @@ namespace Discholder {
     export function create(id: string, nameKey: string, planksId: number, planksData: number, materialId: number, materialData: number, fenceId: number, slabId: number): number {
         IDRegistry.genBlockID(id);
         Block.createBlock(id, [
-            {name: nameKey, texture: [["unknown", 0]], inCreative: true}, 
-            {name: nameKey, texture: [["unknown", 0]], inCreative: false}
+            {name: nameKey, texture: [["planks", 0]], inCreative: true}, 
+            {name: nameKey, texture: [["planks", 0]], inCreative: false}
         ], {base: 5, sound: "wood"});
         ToolAPI.registerBlockMaterial(BlockID[id], "wood", 0, false);
         Block.setDestroyTime(BlockID[id], 40);
         Block.registerDropFunction(id, function(coords, blockID, blockData, level, enchant, item, region){
             return [[blockID, 1, 0]];
         });
-        Item.setCategory(BlockID[id], EItemCategory.DECORATION);
+        Item.setCategory(BlockID[id], Native.ItemCategory.DECORATION);
         setupModel(BlockID[id], planksId, planksData, materialId, materialData);
         setupTile(BlockID[id]);
         Callback.addCallback("PostLoaded", function(){
