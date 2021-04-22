@@ -9,8 +9,8 @@ Discholder.addDisc(756, 0); // stal
 Discholder.addDisc(747, 0); // strad
 Discholder.addDisc(745, 0); // ward
 Discholder.addDisc(744, 0); // 11
-Discholder.addDisc(818, 0); //wait
-Discholder.addDisc(857, 0); //pigstep
+Discholder.addDisc(818, 0); // wait
+Discholder.addDisc(857, 0); // pigstep
 
 (() => {
     let group: number[] = [];

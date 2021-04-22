@@ -1,6 +1,7 @@
 {
     "compilerOptions": {
         "allowJs": true,
+        "removeComments": true,
         "experimentalDecorators": false,
         "downlevelIteration": true,
         "target": "ES5",

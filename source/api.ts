@@ -104,12 +104,13 @@ namespace Discholder {
         ItemModel.getFor(id, 0).setModel(render1);
         ItemModel.getFor(id, 1).setModel(render2);
         Block.registerPlaceFunction(id, function(coords, item, block, player, region){
-            if(coords.side == 1){
-                let yaw = Math.abs(Entity.getLookAngle(player).yaw * 180 / Math.PI);
-                if(yaw <= 135 && yaw > 45) region.setBlock(coords.relative.x, coords.relative.y, coords.relative.z, id, 0);
-                else if(yaw <= 45 || yaw > 135) region.setBlock(coords.relative.x, coords.relative.y, coords.relative.z, id, 1);
-                else throw new java.lang.IllegalStateException("Invalid entity look angle!"); //for debug
-            }
+            let yaw = Math.abs(Entity.getLookAngle(player).yaw * 180 / Math.PI);
+            let data = yaw <= 135 && yaw > 45 ? 0 : 1;
+            let bottom = region.getBlock(coords.relative.x, coords.relative.y - 1, coords.relative.z);
+            let on = region.getBlock(coords.relative.x, coords.relative.y, coords.relative.z);
+            if(!World.canTileBeReplaced(bottom.id, bottom.data) && (on.id == 0 || World.canTileBeReplaced(on.id, on.data))){
+                region.setBlock(coords.relative.x, coords.relative.y, coords.relative.z, id, data);
+            } else region.spawnDroppedItem(coords.relative.x + .5, coords.relative.y + .5, coords.relative.z + .5, item.id, 1, item.data, item.extra);
         });
         Block.setShape(id, 0, 0, 0, 1, 6 / 16, 1);
         const shape = new ICRender.CollisionShape();
@@ -130,7 +131,7 @@ namespace Discholder {
                     for(let i=0; i<7; i++){
                         if(this["model" + i]) this["model" + i].destroy();
                         let xx = this.x + (blockData == 0 ? 1 - (5/32 + 1/8 * i) : 19/32);
-                        let zz = this.z + (blockData == 1 ? 5/32 + 1/8 * i : 19/32);
+                        let zz = this.z + (blockData == 1 ? 1 - (3/32 + 1/8 * i) : 19/32);
                         let yy = this.y + 7/16;
                         this["model" + i] = new Animation.Item(xx, yy, zz);
                         let id = Network.serverToLocalId(this.networkData.getInt("animId" + i));
@@ -171,7 +172,8 @@ namespace Discholder {
                 let blockData = this.blockSource.getBlockData(this.x, this.y, this.z);
                 coords.x %= 1, coords.z %= 1;
                 coords.x *= 8, coords.z *= 8;
-                coords.x = Math.abs(coords.x); coords.z = Math.abs(coords.z);
+                coords.x = coords.x >= 0 ? coords.x : 8 + coords.x;
+                coords.z = coords.z >= 0 ? coords.z : 8 + coords.z;
                 if(blockData == 0){
                     if(coords.x < 0.09375 || coords.x > 7.90625) return -1;
                     return 6 - Math.floor(coords.x - 1);
@@ -223,9 +225,16 @@ namespace Discholder {
             {name: nameKey, texture: [["planks", 0]], inCreative: false}
         ], {base: 5, sound: "wood"});
         ToolAPI.registerBlockMaterial(BlockID[id], "wood", 0, false);
-        Block.setDestroyTime(BlockID[id], 40);
+        Block.setDestroyTime(BlockID[id], 4);
         Block.registerDropFunction(id, function(coords, blockID, blockData, level, enchant, item, region){
             return [[blockID, 1, 0]];
+        });
+        Block.registerNeighbourChangeFunction(BlockID[id], function(coords, block, changedCoords, region){
+            if(coords.x == changedCoords.x && coords.z == changedCoords.z && coords.y == changedCoords.y + 1){
+                if(!GenerationUtils.isTerrainBlock(region.getBlockId(changedCoords.x, changedCoords.y, changedCoords.z))){
+                    region.destroyBlock(coords.x, coords.y, coords.z, true);
+                }
+            }
         });
         Item.setCategory(BlockID[id], Native.ItemCategory.DECORATION);
         setupModel(BlockID[id], planksId, planksData, materialId, materialData);
